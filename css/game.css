@@ -1,0 +1,8 @@
+*{
+	cursor: crosshair;
+	background-color: lightblue;
+	overflow-y: hidden;
+	overflow-x: hidden;
+	margin: 0 auto; 
+	padding: 0;
+}
