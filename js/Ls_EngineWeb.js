@@ -12,6 +12,10 @@ Math.randomInt = function(max){
 	return Math.floor(max * Math.random());
 };
 
+Math.minRandom = function( min, max ) {
+	return Math.random() * ( max - min ) + min;
+}
+
 function hexToRgba( color, Opacity ){
 	var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
 	var red    = parseInt(result[1], 16) + ",";
@@ -26,26 +30,15 @@ function getAngle( x, y, ax, ay ){
 	var angle = Math.round( Math.abs( m / (2 * Math.PI / 360 )) );
 	if( angle == 90 ){ return y > ay ? 180 : 0  ; } //水平線
 	if( angle == 0  ){ return x > ax ? 90  : 270; } //垂直線
-	var Quadrant = 0;
 	if( x < ax && y > ay ){
-		Quadrant = 1;
+		return 270 - angle;
 	}else if( x < ax && y < ay ){
-		Quadrant = 4;
+		return 270 + angle;
 	}else if( x > ax && y > ay ){
-		Quadrant = 2;
+		return 90 + angle;
 	}else if( x > ax && y < ay ){
-		Quadrant = 3;
+		return 90 - angle;
 	}
-	if( Quadrant == 3 ){
-		var answer = 90 - angle;
-	}else if( Quadrant == 2 ){
-		var answer = 90 + angle;
-	}else if( Quadrant == 1 ){
-		var answer = 270 - angle;
-	}else if( Quadrant == 4 ){
-		var answer = 270 + angle;
-	}
-	return answer || 0 ;
 }
 
 //-----------------------------------------------------------------------------
@@ -206,29 +199,40 @@ function Ls_Scene(){
 Ls_Scene.initialize = function() {
 	this.width = Ls_system.screenWidth || 1;
 	this.height = Ls_system.screenHeight || 1;
-	this.getCanvas();
 	this.getRenderer();
+	this.getPlayerRenderer();
 	this.getStage();
 }
 
-Ls_Scene.getCanvas = function(){
-	this.canvas = document.createElement('canvas');
+Ls_Scene.getRenderer = function(){
+	this.canvas = document.getElementById('background');
 	this.canvas.width = this.width;
     this.canvas.height = this.height;
-}
-
-Ls_Scene.getRenderer = function(){
 	this.renderer = PIXI.autoDetectRenderer( this.width, this.height, { view: this.canvas } );
 	this.renderer.autoResize = true;
 	this.renderer.resize( this.width, this.height );
-	this.renderer.backgroundColor = 0x1099bb;
+	this.renderer.backgroundColor = 0x000000;
 	document.body.appendChild(this.renderer.view);
 }
+
+Ls_Scene.getPlayerRenderer = function(){
+	this.playerCanvas = document.getElementById('player');
+	this.playerCanvas.width = this.width;
+    this.playerCanvas.height = this.height;
+	this.playerRenderer = PIXI.autoDetectRenderer( this.width, this.height, { view: this.playerCanvas , transparent: true } );
+	this.playerRenderer.autoResize = true;
+	this.playerRenderer.resize( this.width, this.height );
+	this.renderer.backgroundColor = 0x0000ff;
+	document.body.appendChild(this.playerRenderer.view);
+}
+
 Ls_Scene.getStage = function(){
 	this.stage = new PIXI.Container();
 	this.stage.addChild( new Ls_backGround() );
 	this.stage.addChild( new Ls_gameEvent() );
-	this.stage.addChild( new Ls_Player() );
+	this.stage.addChild( new Ls_mountain() );
+	this.playerStage = new PIXI.Container();
+	this.playerStage.addChild( new Ls_Player() );
 }
 
 Ls_Scene.mainUpdate = function(){
@@ -239,6 +243,7 @@ Ls_Scene.mainUpdate = function(){
 
 Ls_Scene.stageUpdate = function(){
 	this.stage.children.forEach( function(child) { if (child.update) { child.update(); } });
+	this.playerStage.children.forEach( function(child) { if (child.update) { child.update(); } });
 }
 
 Ls_Scene.eventUpdate = function(){
@@ -247,6 +252,7 @@ Ls_Scene.eventUpdate = function(){
 
 Ls_Scene.animate = function(){
 	this.renderer.render(this.stage);
+	this.playerRenderer.render(this.playerStage);
 }
 
 //-----------------------------------------------------------------------------
@@ -311,6 +317,138 @@ Ls_Canvas.prototype.drawRect = function( x, y, w, h, color, opacity ) {
 	this.context.fillRect( x, y, w, h );
 	this.context.restore();
 };
+
+//-----------------------------------------------------------------------------
+// 建立玩家
+//
+
+function Ls_Player(){
+	this.initialize.apply(this, arguments);
+}
+
+Ls_Player.prototype = Object.create(Ls_Canvas.prototype);
+Ls_Player.prototype.constructor = Ls_Player;
+
+Ls_Player.prototype.initialize = function(){
+	Ls_Canvas.prototype.initialize.call(this);
+	this.x = 0;
+	this.y = 0;
+	this.shotWait = 0;
+	this.setBigGun();
+	this.setSE();
+	this.nowActionShot = true;
+	this.setTrans();
+}
+
+Ls_Player.prototype.setTrans = function(){
+	this.trans = document.getElementById('player');
+	this.trans.style.transformOrigin = "50% 100%";
+	this.transData = "perspective(1000px)";
+	this.transX = 0;
+	this.transY = 0;
+}
+
+Ls_Player.prototype.setBigGun = function(){
+	var system = this;
+	this.bigGun = new Image();
+	this.bigGun.src = Ls_Manager.getImageName("GUN")
+	this.bigGunShot = new Image();
+	this.bigGunShot.src = Ls_Manager.getImageName("GUN-SHOT");
+	this.bigGun.onload = function(){ system.drawBigGun(); };
+}
+
+Ls_Player.prototype.mouseMove = function(){
+	if( Ls_Touch.nowAction("move") ){
+		this.transX = -50 + Ls_Touch.y / ( Ls_system.screenHeight / 50 );
+		this.transY = 45 - Ls_Touch.x / ( Ls_system.screenWidth / 90 );
+		this.getTrans();
+	}
+}
+
+Ls_Player.prototype.getTrans = function(){
+	this.trans.style.transform = this.transData + " rotateX(" + this.transX + "deg) rotateY(" + this.transY + "deg) rotateZ(0deg)";
+}
+
+Ls_Player.prototype.drawBigGun = function(){
+	this.canvasClear();
+	var x = Ls_system.screenWidth / 2 - this.bigGun.width / 2;
+	var y = Ls_system.screenHeight - this.bigGun.height + 50;
+	var w = this.bigGun.width;
+	var h = this.bigGun.height;
+	this.context.drawImage( this.bigGun, 0, 0, w, h, x, y, w, h);
+	this.nowActionShot = false;
+	this.action();
+}
+
+Ls_Player.prototype.update = function(){
+	if( this.nowActionShot ){
+		this.drawBigGun();
+	}
+	if( Ls_Touch.nowAction("keepdonw_left") && this.shotWait === 0 ){
+		this.shot();
+	}
+	if( this.shotWait !== 0 ){
+		this.shotWait -= 1;
+	}
+	this.mouseMove();
+}
+
+Ls_Player.prototype.shot = function(){
+	Ls_event.makeBullet();
+	this.openSE();
+	this.canvasClear();
+	this.shotWait = 5;
+	var x = Ls_system.screenWidth / 2 - this.bigGunShot.width / 2;
+	var y = Ls_system.screenHeight - this.bigGunShot.height + 62;
+	var w = this.bigGunShot.width;
+	var h = this.bigGunShot.height;
+	this.context.drawImage( this.bigGunShot, 0, 0, w, h, x, y, w, h);
+	this.nowActionShot = true;
+	this.action();
+}
+
+Ls_Player.prototype.action = function(){
+	this.bitmap.texture.update();
+}
+
+Ls_Player.prototype.setSE = function() {
+	this.se = new Audio("audio/" + encodeURIComponent('GUN') + ".wav");
+}
+
+Ls_Player.prototype.openSE = function() {
+	if( this.se.currentTime >= this.se.duration - 0.5 ){
+		this.se.currentTime = 0;
+	}
+	this.se.play();
+}
+
+//-----------------------------------------------------------------------------
+// 建立山脈
+//
+
+function Ls_mountain(){
+	this.initialize.apply(this, arguments);
+}
+
+Ls_mountain.prototype = Object.create(Ls_Canvas.prototype);
+Ls_mountain.prototype.constructor = Ls_mountain;
+
+Ls_mountain.prototype.initialize = function(){
+	Ls_Canvas.prototype.initialize.call(this);
+	this.mountain = new Image();
+	this.mountain.src = "img/" + encodeURIComponent('Mountain') + ".png";
+	var w = Ls_system.screenWidth;
+	var h = Ls_system.screenHeight;
+	this.context.drawImage( this.mountain, 0, 0 , w, h, 0, this.height - 135, w, h );
+}
+
+Ls_mountain.prototype.update = function(){
+	this.canvasClear();
+	var w = Ls_system.screenWidth;
+	var h = Ls_system.screenHeight;
+	this.context.drawImage( this.mountain, 0, 0 , w, h, 0, this.height - 135, w, h );
+	this.bitmap.texture.update();
+}
 
 //-----------------------------------------------------------------------------
 // 建立遊戲背景層
@@ -413,6 +551,7 @@ Ls_gameEvent.prototype.initialize = function(){
 	Ls_Canvas.prototype.initialize.call(this);
 	this.data = {};
 	this.layerData = [];
+	this.context.lineCap="round";
 }
 
 Ls_gameEvent.prototype.update = function(){
@@ -433,18 +572,33 @@ Ls_gameEvent.prototype.readZaxisData = function(){
 		this.data = this.layerData[i];
 		if( this.data.type === "bullet" ){
 			this.drawBullet();
+		}else if( this.data.type === "particle" ){
+			this.drawParticle();
 		}else{
 			this.drawSprite();
 		}
 	}
 }
 
+Ls_gameEvent.prototype.drawParticle = function(){
+	var w = 15  * ( this.data.z / 100 );
+	this.context.fillStyle = "rgba(255,105,0,0.9)";
+	this.context.fillRect( this.data.x - (w / 2), this.data.y - (w / 2), w, w );
+}
+
 Ls_gameEvent.prototype.drawBullet = function(){
 	if( this.data.wait === 0 ){
-		var w = this.data.rect * ( this.data.z / 100 );
-		var x = this.data.x - (w / 2);
-		var y = this.data.y - (w / 2);
-		this.drawRect( x, y, w, w, "#FFFF00", 200 );
+		this.context.lineWidth = this.data.z / 13;
+		var h = this.data.rect * 2 * ( this.data.z / 100 );
+		var x = this.data.x ;
+		var y = this.data.y ;
+		var dx = Math.floor( x + ( h ) * Math.cos( (this.data.angle) * Ls_system.PI ) );
+		var dy = Math.floor( y + ( h ) * Math.sin( (this.data.angle) * Ls_system.PI ) );
+		this.context.beginPath();
+		this.context.moveTo(x,y);
+		this.context.lineTo( dx, dy );
+		this.context.strokeStyle = "rgba(255,255,0,0.8)";
+		this.context.stroke();
 	}
 }
 
@@ -604,6 +758,7 @@ Ls_Airplane.prototype.move = function(){
 Ls_Airplane.prototype.checkDead = function(){
 	if( this.life && this.hp < 0 ){
 		Ls_event.makeBoom( this.x, this.y, this.z + 1 );
+		Ls_event.makeParticle( this.x, this.y, this.z + 1 );
 		Ls_event.makeCrash( this.x, this.y, this.z );
 		this.removeEvent();
 	}
@@ -815,6 +970,48 @@ Ls_Boom.prototype.openSE = function() {
 }
 
 //-----------------------------------------------------------------------------
+// 建立爆炸粒子
+//
+
+function Particle( x, y ) {
+	this.initialize.apply(this, arguments);
+}
+
+Particle.prototype = Object.create(Ls_Character.prototype);
+Particle.prototype.constructor = Particle;
+
+Particle.prototype.initialize = function( x, y, z ){
+	this.id = Ls_event.id;
+	this.type = "particle";
+	this.x = x;
+	this.y = y;
+	this.z = z;
+	this.coordinates = [];
+	this.coordinateCount = 5;
+	while( this.coordinateCount-- ) {
+		this.coordinates.push( [ this.x, this.y ] );
+	}
+	this.angle = Math.minRandom( 0, Math.PI * 2 );
+	this.speed = Math.minRandom( 1, 10 );
+	this.friction = 0.95;
+	this.gravity = 1;
+	this.alpha = 1;
+	this.decay = Math.minRandom( 0.015, 0.03 );
+}
+
+Particle.prototype.update = function() {
+	this.coordinates.pop();
+	this.coordinates.unshift( [ this.x, this.y ] );
+	this.speed *= this.friction;
+	this.x += Math.cos( this.angle ) * this.speed;
+	this.y += Math.sin( this.angle ) * this.speed + this.gravity;
+	this.alpha -= this.decay;
+	if( this.alpha <= this.decay ) {
+		this.removeEvent();
+	}
+}
+
+//-----------------------------------------------------------------------------
 // 建立雲層
 //
 
@@ -951,109 +1148,6 @@ Ls_Bullet.prototype.move = function(){
 }
 
 //-----------------------------------------------------------------------------
-// 建立玩家
-//
-
-function Ls_Player(){
-	this.initialize.apply(this, arguments);
-}
-
-Ls_Player.prototype = Object.create(Ls_Canvas.prototype);
-Ls_Player.prototype.constructor = Ls_Player;
-
-Ls_Player.prototype.initialize = function(){
-	Ls_Canvas.prototype.initialize.call(this);
-	this.x = 0;
-	this.y = 0;
-	this.shotWait = 0;
-	this.setBigGun();
-	this.setMountain();
-	this.setSE();
-	this.nowActionShot = true;
-}
-
-Ls_Player.prototype.setBigGun = function(){
-	var system = this;
-	this.bigGun = new Image();
-	this.bigGun.src = Ls_Manager.getImageName("GUN")
-	this.bigGunShot = new Image();
-	this.bigGunShot.src = Ls_Manager.getImageName("GUN-SHOT");
-	this.bigGun.onload = function(){ system.drawBigGun(); };
-}
-
-Ls_Player.prototype.setMountain = function(){
-	this.mountain = new Image();
-	this.mountain.src = "img/" + encodeURIComponent('Mountain') + ".png";
-}
-
-Ls_Player.prototype.drawMountain = function(){
-	var w = Ls_system.screenWidth;
-	var h = Ls_system.screenHeight;
-	this.context.drawImage( this.mountain, 0, 0 , w, h, 0, this.height - 135, w, h );
-}
-
-Ls_Player.prototype.drawBigGun = function(){
-	this.canvasClear();
-	this.drawMountain();
-	var x = Ls_system.screenWidth / 2 - this.bigGun.width / 2;
-	var y = Ls_system.screenHeight - this.bigGun.height + 50;
-	var w = this.bigGun.width;
-	var h = this.bigGun.height;
-	this.context.drawImage( this.bigGun, 0, 0, w, h, x, y, w, h);
-	this.nowActionShot = false;
-	this.action();
-}
-
-Ls_Player.prototype.update = function(){
-	if( this.nowActionShot ){
-		this.drawBigGun();
-	}
-	if( Ls_Touch.nowAction("keepdonw_left") && this.shotWait === 0 ){
-		this.shot();
-	}
-	if( this.shotWait !== 0 ){
-		this.shotWait -= 1;
-	}
-	this.mouseMove();
-}
-
-Ls_Player.prototype.mouseMove = function(){
-	if( Ls_Touch.nowAction("move") ){
-		//滑鼠移動
-	}
-}
-
-Ls_Player.prototype.shot = function(){
-	Ls_event.makeBullet();
-	this.openSE();
-	this.canvasClear();
-	this.drawMountain();
-	this.shotWait = 5;
-	var x = Ls_system.screenWidth / 2 - this.bigGunShot.width / 2;
-	var y = Ls_system.screenHeight - this.bigGunShot.height + 62;
-	var w = this.bigGunShot.width;
-	var h = this.bigGunShot.height;
-	this.context.drawImage( this.bigGunShot, 0, 0, w, h, x, y, w, h);
-	this.nowActionShot = true;
-	this.action();
-}
-
-Ls_Player.prototype.action = function(){
-	this.bitmap.texture.update();
-}
-
-Ls_Player.prototype.setSE = function() {
-	this.se = new Audio("audio/" + encodeURIComponent('GUN') + ".wav");
-}
-
-Ls_Player.prototype.openSE = function() {
-	if( this.se.currentTime >= this.se.duration - 0.5 ){
-		this.se.currentTime = 0;
-	}
-	this.se.play();
-}
-
-//-----------------------------------------------------------------------------
 // 事件主控層
 //
 
@@ -1109,6 +1203,14 @@ Ls_EventManager.prototype.makeBoom = function( x, y, z ){
 	this.data.push( new Ls_Boom( x, y, z ) );
 }
 
+Ls_EventManager.prototype.makeParticle = function( x, y, z ){
+	var particleCount = 60;
+	while( particleCount-- ) {
+		this.setId();
+		this.data.push( new Particle( x, y, z ) );
+	}
+}
+
 Ls_EventManager.prototype.makeRipple = function( x, y, z ){
 	this.setId();
 	this.data.push( new Ls_Ripple( x, y, z ) );
@@ -1121,14 +1223,7 @@ Ls_EventManager.prototype.makeBullet = function(){
 		this.setId();
 		var x = Ls_Touch.x + Math.randomInt(rand) - Math.randomInt(rand);
 		var y = Ls_Touch.y + Math.randomInt(rand) - Math.randomInt(rand);
-		for( var i = 0 ; i < 3 ; i++ ){
-			if( i === 0 ){
-				this.data.push( new Ls_Bullet( x, y, 15 - i * 3, false, 0 ) );
-			}else{
-				this.data.push( new Ls_Bullet( x, y, 15 - i * 3, true, i ) );
-			}
-			
-		}
+		this.data.push( new Ls_Bullet( x, y, 15, false, 0 ) );
 	}
 }
 

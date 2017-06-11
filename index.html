@@ -2,17 +2,58 @@
 <html>
     <head>
         <meta charset="UTF-8">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="viewport" content="user-scalable=no">
-        <link rel="icon" href="icon/icon.png" type="image/png">
-        <link rel="apple-touch-icon" href="icon/icon.png">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" href="icon/icon.png" >
         <link rel="stylesheet" type="text/css" href="css/game.css">
+		<script type="text/javascript" src="js/pixi_min.js"></script>
         <title>打飛機PX-螢幕保護程式</title>
     </head>
     <body>
-		<script type="text/javascript" src="js/pixi_min.js"></script>
-		<script type="text/javascript" src="js/Ls_EngineWeb.js"></script>
-        <script type="text/javascript" src="js/main.js"></script>
+		<script>
+			var gui = require('nw.gui');
+			var debugWindow = {};
+			debugWindow = gui.Window.get().showDevTools();
+			debugWindow.moveTo( 0, 0 );
+		</script>
+		<script>
+			var app = new PIXI.Application(document.body.clientWidth, 600, {backgroundColor: 0x000000});
+			var style = new PIXI.TextStyle({ fill: '#ffffff' });
+			var basicText = new PIXI.Text('Loading...',style);
+			var graphics = new PIXI.Graphics();
+			var graphicsBase = new PIXI.Graphics();
+			var loadData = 136 / 100;
+			basicText.anchor.set(0.5);
+			basicText.x = document.body.clientWidth / 2;
+			basicText.y = 100;
+			graphics.lineStyle(1, 0xffffff, 2);
+			graphics.drawRect( basicText.x - 70, 120, 140, 10);
+			graphicsBase.lineStyle(0, 0xffffff, 0);
+			graphicsBase.beginFill(0xFFFFFF);
+			app.stage.addChild(basicText);
+			app.stage.addChild(graphics);
+			app.stage.addChild(graphicsBase);
+			document.body.appendChild(app.view);
+			PIXI.loader.add([
+				'/img/BOOM.png',
+				'/img/Cloud1.png',
+				'/img/Cloud2.png',
+				'/img/Crash.png',
+				'/img/CrashFog.png',
+				'/img/Event-Airplane.png',
+				'/img/GUN.png',
+				'/img/GUN-SHOT.png',
+				'/img/Mountain.png',
+				'/img/Ripple.png',
+				'/img/SEA.png',
+				'/img/WAVE.png',
+			])
+			.on("progress", addload).load(trun);
+			function addload( loader, resource ){
+				graphicsBase.drawRect( basicText.x - 69, 122, loadData * loader.progress, 6);
+			}
+			function trun(){
+				document.location.href="main.html";
+			}
+		</script>
     </body>
 </html>

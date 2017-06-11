@@ -1,8 +1,22 @@
 *{
-	cursor: crosshair;
-	background-color: lightblue;
 	overflow-y: hidden;
 	overflow-x: hidden;
 	margin: 0 auto; 
 	padding: 0;
 }
+
+#background{
+	position:absolute;
+	z-index:1;
+}
+
+#player{
+	position:absolute;
+	z-index:2;
+}
+
+#main{
+	margin:0 auto;
+	padding-top:1em;
+}
+
